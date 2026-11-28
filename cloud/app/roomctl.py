@@ -27,8 +27,10 @@ BUS = None
 DEFAULT = {"on": False, "srcs": [], "kp": 1.0, "ki": 2.0, "cut": 0.5, "up": 5.0, "down": 8.0}
 MAX_AGE = 1800              # Fuehlerwert gilt 30 min
 MIN_GAP = 240               # Geraet hoechstens alle 4 min verstellen (ausser bei grossem Sprung)
+RESEND = 1800               # denselben Wert erst nach 30 min erneut senden
 _lock = threading.RLock()
-_mismatch = {}              # dev -> Zahl der Durchlaeufe, in denen das Geraet etwas anderes zeigt als gesendet
+_seen = {}                  # dev -> (zuletzt gesehene Solltemperatur am Geraet, Zeitpunkt)
+_pending = {}               # dev -> von der Fernbedienung? beim naechsten Durchlauf bestaetigen
 
 
 def init_db():
@@ -168,12 +170,20 @@ def step():
                 continue
             raw = _row(dev)
             cur = st.get("target_C")
-            # Am Geraet (Fernbedienung) verstellt -> neuer Wunsch (zweimal hintereinander gesehen)
-            diff = (raw["last_tgt"] is not None and cur is not None and abs(cur - raw["last_tgt"]) > 0.01
-                    and now - (raw["last_set"] or 0) > 30)
-            _mismatch[dev] = _mismatch.get(dev, 0) + 1 if diff else 0
-            if _mismatch[dev] >= 2:
-                _mismatch[dev] = 0
+            # Am Geraet (Fernbedienung) verstellt -> neuer Wunsch. Nur wenn sich der Geraetewert von selbst
+            # geaendert hat (nicht, wenn die Anlage einen gesendeten Wert begrenzt oder einen Befehl verpasst hat)
+            # und der neue Wert beim naechsten Durchlauf noch steht.
+            prev, prev_ts = _seen.get(dev, (None, 0))
+            _seen[dev] = (cur, now)
+            remote = False
+            if cur is not None and raw["last_tgt"] is not None and abs(cur - raw["last_tgt"]) > 0.01:
+                if _pending.get(dev) is not None and abs(_pending[dev] - cur) < 0.01:
+                    remote = True
+                elif prev is not None and abs(cur - prev) > 0.01 and (raw["last_set"] or 0) < prev_ts - 5:
+                    _pending[dev] = cur                    # nicht die Antwort auf unseren letzten Befehl
+            if remote or (_pending.get(dev) is not None and abs(_pending[dev] - (cur or 0)) > 0.01):
+                _pending.pop(dev, None)
+            if remote:
                 q("UPDATE climate_rc SET wish=?, last_tgt=? WHERE dev=?", (cur, cur, dev))   # Ausgleich bleibt
                 r["wish"] = cur
                 alert(dev, "rule", f"{dev_name(dev)}: Raumregelung übernimmt {cur:g} °C von der Fernbedienung",
@@ -203,7 +213,7 @@ def step():
                 q("UPDATE climate_rc SET off=? WHERE dev=?", (off, dev))
                 r["off"] = off
             q("UPDATE climate_rc SET room=?, info=? WHERE dev=?", (room, info, dev))
-            if not st.get("output") or _mismatch.get(dev):    # aus, oder Fernbedienung gerade verstellt: abwarten
+            if not st.get("output") or dev in _pending:      # aus, oder Fernbedienung gerade verstellt: abwarten
                 continue
             if mode not in ("heat", "cool"):
                 tgt = r["wish"]
@@ -213,13 +223,19 @@ def step():
                 if raw["last_tgt"] is None and cur is not None:
                     q("UPDATE climate_rc SET last_tgt=? WHERE dev=?", (cur, dev))
                 continue
-            if now - (raw["last_set"] or 0) < MIN_GAP and abs(tgt - cur) < 2:
+            same = raw["last_tgt"] is not None and abs(tgt - raw["last_tgt"]) < 0.01
+            if same and now - (raw["last_set"] or 0) < RESEND:
+                continue                                   # schon gesendet; Anlage begrenzt (Midea heizt ab 17 °C)
+            if not same and now - (raw["last_set"] or 0) < MIN_GAP and abs(tgt - cur) < 2:
                 continue
             try:
-                BUS.rpc(dev, "Climate.Set", {"id": 0, "target_C": tgt})
+                BUS.rpc(dev, "Climate.Set", {"id": 0, "target_C": tgt}, timeout=15)
                 q("UPDATE climate_rc SET last_tgt=?, last_set=? WHERE dev=?", (tgt, now, dev))
+            except TimeoutError:                           # Befehl ist meist angekommen, nur die Antwort fehlt
+                q("UPDATE climate_rc SET last_tgt=?, last_set=?, info=? WHERE dev=?",
+                  (tgt, now, "Gerät bestätigt Befehle nicht (MQTT-Antwort fehlt)", dev))
             except Exception as ex:
-                q("UPDATE climate_rc SET info=? WHERE dev=?", (f"Gerät nicht erreichbar: {ex}", dev))
+                q("UPDATE climate_rc SET info=? WHERE dev=?", (f"Gerät: {ex}", dev))
 
 
 def view(dev):

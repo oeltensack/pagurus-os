@@ -307,6 +307,8 @@ class Bus:
             raise RuntimeError("Keine Verbindung zum MQTT-Broker")
         if is_gen1_sensor(real_id(dev)):
             raise RuntimeError(f"{dev_name(dev)}: Batteriefühler – nur Messwerte, keine Befehle")
+        if method.startswith("Climate."):          # Klima-ESP wartet auf die Anlage (UART), Midea bis ~4 s
+            timeout = max(timeout, 15)
         rid = next(self.ids)
         ev, box = threading.Event(), []
         self.wait[rid] = (ev, box)

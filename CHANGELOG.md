@@ -1,5 +1,13 @@
 # Änderungen
 
+## Pagurus Cloud 1.28.1
+- Raumregelung: Begrenzt die Anlage einen gesendeten Wert (Midea heizt erst ab 17 °C), wird das nicht mehr als
+  Eingabe an der Fernbedienung übernommen. Als Fernbedienung zählt nur eine Änderung, die nicht auf einen eigenen
+  Befehl folgt. Derselbe Wert wird erst nach 30 min erneut gesendet.
+- Bleibt die Antwort des Geräts aus (schwaches WLAN), gilt der Befehl als gesendet. Die Karte zeigt „Gerät bestätigt
+  Befehle nicht“.
+- Klima-Befehle warten bis zu 15 s auf die Antwort statt 6 s. Der Midea-ESP wartet selbst bis zu 4 s auf die Anlage.
+
 ## Pagurus Cloud 1.28.0
 - **Raumregelung für Klimaanlagen** (Karte → „Raumregelung …“). Die eingestellte Temperatur gilt für den Raum. Die
   Cloud misst ihn mit einem oder mehreren Fühlern (Mittelwert) und verstellt jede Minute die Solltemperatur am
