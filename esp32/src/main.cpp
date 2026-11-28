@@ -27,6 +27,10 @@
 #include "webui_gz.h"
 #endif
 
+#ifdef FW_VERSION_OVR                   // einzelne Variante vorab mit eigener Version (platformio.ini)
+#undef FW_VERSION
+#define FW_VERSION FW_VERSION_OVR
+#endif
 #ifndef FW_VERSION
 #define FW_VERSION "0.0.0"
 #endif
@@ -183,6 +187,7 @@ void wifiStatus(JsonObject o) {
   o["status"] = c ? "got ip" : "disconnected";
   o["ssid"] = c ? WiFi.SSID() : (const char*)nullptr;
   if (c) o["rssi"] = WiFi.RSSI();
+  o["tx_dbm"] = WiFi.getTxPower() / 4.0;
   o["ap"] = apActive;
 }
 
@@ -290,7 +295,7 @@ void handleMqtt() {
     bool ok = cfg.mqUser.length()
       ? mq.connect(devId.c_str(), cfg.mqUser.c_str(), cfg.mqPass.c_str(), will.c_str(), 0, true, "false")
       : mq.connect(devId.c_str(), nullptr, nullptr, will.c_str(), 0, true, "false");
-    if (!ok) { mqNext = millis() + mqBackoff; mqBackoff = min<uint32_t>(mqBackoff * 2, 120000); return; }
+    if (!ok) { mqNext = millis() + mqBackoff; mqBackoff = min<uint32_t>(mqBackoff * 2, 30000); return; }
     mqBackoff = 5000;
     mq.publish(will.c_str(), "true", true);
     mq.subscribe((mqPre() + "/rpc").c_str());
@@ -509,10 +514,19 @@ void handleRpcGet(const String& method) {
 }
 
 // ======================= WLAN =======================
+// ESP32-C3 SuperMini: Quarz direkt an der Keramikantenne, schlecht angepasst. Mit voller Sendeleistung bricht die
+// Verbindung staendig ab; 8,5 dBm (WIFI_TX_X4=34) laeuft stabil. Muss nach jedem WiFi.mode()/begin() neu gesetzt werden.
+void applyTx() {
+#ifdef WIFI_TX_X4
+  WiFi.setTxPower((wifi_power_t)WIFI_TX_X4);
+#endif
+}
+
 void startAP() {
   if (apActive) return;
   String ssid = String(DEV_PREFIX) + "-" + mac.substring(6);
   WiFi.mode(cfg.ssid.length() ? WIFI_AP_STA : WIFI_AP);
+  applyTx();
   WiFi.softAPConfig(IPAddress(192, 168, 33, 1), IPAddress(192, 168, 33, 1), IPAddress(255, 255, 255, 0));
   WiFi.softAP(ssid.c_str());
   dns.start(53, "*", IPAddress(192, 168, 33, 1));
@@ -521,7 +535,7 @@ void startAP() {
 
 void stopAP() {
   if (!apActive) return;
-  dns.stop(); WiFi.softAPdisconnect(true); WiFi.mode(WIFI_STA); apActive = false;
+  dns.stop(); WiFi.softAPdisconnect(true); WiFi.mode(WIFI_STA); applyTx(); apActive = false;
 }
 
 void handleWifi() {
@@ -557,8 +571,10 @@ void setup() {
   WiFi.persistent(false);
   WiFi.setHostname(devId.c_str());
   WiFi.mode(WIFI_STA);
+  applyTx();
   if (cfg.ssid.length()) WiFi.begin(cfg.ssid.c_str(), cfg.pass.c_str());
   else startAP();
+  applyTx();
   WiFi.setAutoReconnect(true);
   WiFi.setSleep(false);                     // kein Modem-Sleep: sonst antwortet die Weboberflaeche traege
   configTzTime("CET-1CEST,M3.5.0,M10.5.0/3", "pool.ntp.org", "time.cloudflare.com");

@@ -1,5 +1,13 @@
 # Änderungen
 
+## Firmware 1.19.5 – nur Midea (ESP32-C3), vorab
+- Die Sendeleistung des WLAN ist auf 8,5 dBm begrenzt. Beim ESP32-C3 SuperMini sitzt der Quarz direkt an der
+  Keramikantenne. Mit voller Leistung riss die Verbindung ständig ab (−73 dBm, MQTT getrennt, Befehle ohne Antwort).
+  Die Leistung wird nach jedem WLAN-Moduswechsel neu gesetzt. `Wifi.GetStatus` zeigt sie als `tx_dbm`.
+- MQTT verbindet nach einem Abbruch spätestens nach 30 s neu, bisher erst nach 120 s.
+- Vorab-Version über `FW_VERSION_OVR`, nur für die Variante `midea_c3`. `tools/make_release.py` entfernt sie beim
+  nächsten Release. **Das nächste Release muss mindestens 1.19.6 heißen**, sonst bekommt die Midea es nicht angeboten.
+
 ## Pagurus Cloud 1.28.1
 - Raumregelung: Begrenzt die Anlage einen gesendeten Wert (Midea heizt erst ab 17 °C), wird das nicht mehr als
   Eingabe an der Fernbedienung übernommen. Als Fernbedienung zählt nur eine Änderung, die nicht auf einen eigenen

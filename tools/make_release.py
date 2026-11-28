@@ -37,6 +37,7 @@ subprocess.run(["pio", "run"], cwd=ROOT, check=True)
 # ESP32 (Klimaanlagen TCL und Midea, Heizungsanzeige AZ-Touch): eigenes PlatformIO-Projekt in esp32/, gleiche Versionsnummer
 e32 = ROOT / "esp32"
 e32ini = (e32 / "platformio.ini").read_text()
+e32ini = re.sub(r' -DFW_VERSION_OVR=\\"[0-9.]+\\"', '', e32ini)   # Vorab-Version einer Variante endet mit dem Release
 (e32 / "platformio.ini").write_text(re.sub(r'FW_VERSION=\\"[0-9.]+\\"', f'FW_VERSION=\\\\"{version}\\\\"', e32ini))
 subprocess.run(["pio", "run", "-d", str(e32)], check=True)
 
