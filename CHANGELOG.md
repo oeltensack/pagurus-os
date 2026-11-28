@@ -1,5 +1,16 @@
 # Änderungen
 
+## Pagurus Cloud 1.28.0
+- **Raumregelung für Klimaanlagen** (Karte → „Raumregelung …“). Die eingestellte Temperatur gilt für den Raum. Die
+  Cloud misst ihn mit einem oder mehreren Fühlern (Mittelwert) und verstellt jede Minute die Solltemperatur am
+  Innengerät: Gerät = Wunsch + P·(Wunsch − Raum) + Ausgleich. Der Ausgleich (I-Anteil) lernt die Abweichung des
+  Gerätefühlers. Ab Wunsch + 0,5 K geht das Gerät auf seine kleinste Temperatur (Kompressor aus), beim Kühlen auf
+  die größte. Das Gerät wird höchstens alle 4 min verstellt.
+- Zeitpläne, Karte, Wandtafel und Portal setzen bei aktiver Raumregelung den Wunsch, nicht den Gerätewert.
+  Angezeigt werden Wunsch und Raumfühler, dazu auf der Karte „Raum … → Gerät …“. Der Verlauf zeigt als Soll den Wunsch.
+- Eine an der Fernbedienung eingestellte Temperatur wird als neuer Wunsch übernommen.
+- Mehrere Anlagen auf einer Ebene: dieselben Fühler wählen, dann heizt die Anlage mit dem höchsten Wunsch.
+
 ## Pagurus Cloud 1.27.7
 - Klimaanlagen mit „Nur Anzeige“ sperren jetzt nur noch das Ein-/Ausschalten von Hand. Solltemperatur, Modus,
   Lüfter, Swing, Eco/Turbo/Leise und Anzeige lassen sich wieder bedienen. Vorher waren alle Bedienelemente

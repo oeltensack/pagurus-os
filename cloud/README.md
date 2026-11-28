@@ -16,6 +16,10 @@ Docker-Paket. Sie ist **optional**: Die Geräte arbeiten ohne sie genauso, die C
   Temperatur von Fühlern (Shelly H&T, Add-on …) oder Wetter (Open-Meteo, ohne Schlüssel), optional Innentemperatur,
   Höchstwert-Vorhersage und Sonneneinstrahlung, Verzögerung, Zeitfenster, Frostschutz. Fährt nur nach unten,
   öffnet danach nur, wenn der Rollladen noch dort steht, und lässt von Hand bewegte Rollläden in Ruhe
+- **Klima-Raumregelung:** Solltemperatur am Innengerät nach externem Raumfühler (BLU, H&T, Wall Display,
+  DHT22 am Gerät, Mittelwert mehrerer) nachführen – das Gerät misst unter der Decke zu warm; PI-Regler lernt die
+  Abweichung, schaltet bei Erreichen ab, übernimmt Werte von der Fernbedienung; mehrere Anlagen auf einer Ebene
+  teilen sich die Fühler
 - **Parallel zur Shelly Cloud:** Shelly Gen2/Gen3/Gen4 mit Original-Firmware im Netz suchen und mit einem Klick
   verbinden – App, Szenen und Shelly Cloud laufen weiter
 - **Automatik:** Zeitpläne (Uhrzeit oder Sonnenauf-/untergang ± Minuten, Wochentage, Gerät oder Raum) und

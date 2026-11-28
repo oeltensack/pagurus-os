@@ -35,6 +35,7 @@ import heizung
 import scripts
 import panel
 import portal
+import roomctl
 import shade
 import winopen
 from bus import BUS, check_offline, seen, set_status
@@ -264,6 +265,7 @@ def startup():
     shade.start(BUS)
     winopen.start(BUS)
     climate.start(BUS)
+    roomctl.start(BUS)
     heizung.start()
     scripts.start(BUS)
     threading.Thread(target=watchdog, daemon=True).start()
@@ -418,6 +420,7 @@ async def dev_climate(dev: str, request: Request):
         if k in d:
             p[k] = d[k]
     try:
+        p = await asyncio.to_thread(roomctl.filter_set, dev, p)
         res = await asyncio.to_thread(BUS.rpc, dev, "Climate.Set", p)
         st = await asyncio.to_thread(BUS.rpc, dev, "Climate.GetStatus", {"id": 0})
         set_status(dev, "climate:0", st, merge=True)
@@ -562,6 +565,7 @@ async def wd_act(tok: str, request: Request):
             await asyncio.to_thread(BUS.switch, ref, None, None, None, int(v))
         elif a == "climate" and isinstance(v, dict):
             prm = {"id": 0, **{k: x for k, x in v.items() if k in panel.CLIMATE_KEYS}}
+            prm = await asyncio.to_thread(roomctl.filter_set, ref, prm)
             await asyncio.to_thread(BUS.rpc, ref, "Climate.Set", prm)
             st = await asyncio.to_thread(BUS.rpc, ref, "Climate.GetStatus", {"id": 0})
             set_status(ref, "climate:0", st, merge=True)
@@ -586,7 +590,9 @@ def climates():
         if w:
             wo = {**winopen.view(r["id"]), "sensors": len(w["cfg"]["sensors"]), "drop": w["cfg"]["drop"],
                   "modes": w["cfg"]["modes"]}
-        out.append(climate.view(d, wo))
+        v = climate.view(d, wo)
+        v["rc"] = roomctl.view(r["id"])
+        out.append(v)
     return out
 
 
@@ -607,6 +613,28 @@ def climate_sched_delete(dev: str, sid: int, request: Request):
     need(request, "admin")
     q("DELETE FROM climate_sched WHERE id=? AND dev=?", (sid, dev))
     return {"ok": True}
+
+
+@app.get("/api/climates/{dev}/rc")
+def roomctl_get(dev: str, request: Request):
+    need(request, "admin")
+    get_dev(dev)
+    r = roomctl.get(dev)
+    sens = [x for x in shade.sensors() if x["unit"] == "°C"]
+    return {"cfg": r["cfg"] if r else roomctl.DEFAULT, "state": roomctl.view(dev), "sensors": sens}
+
+
+@app.post("/api/climates/{dev}/rc")
+async def roomctl_save(dev: str, request: Request):
+    """Raumregelung: Solltemperatur am Geraet nach externem Raumfuehler nachfuehren."""
+    need(request, "admin")
+    r = get_dev(dev)
+    if not (r["comp"] or "").startswith("climate:"):
+        raise HTTPException(400, "Keine Klimaanlage")
+    try:
+        return {"cfg": await asyncio.to_thread(roomctl.save, dev, await request.json())}
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, str(e))
 
 
 @app.get("/api/devices/{dev}/winopen")

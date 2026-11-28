@@ -53,6 +53,12 @@ def _compact(d):
                                              "modes", "fans", "min_C", "max_C", "step_C") if s.get(k) is not None})
         if s.get("ext_temperature_C") is not None:
             out["tC"] = s["ext_temperature_C"]
+        import roomctl
+        rc = roomctl.view(d["id"]) if d.get("id") else None
+        if rc and rc["wish"] is not None:                 # Raumregelung: Wunsch statt Geraete-Soll zeigen
+            out["cl"]["target_C"] = rc["wish"]
+            if rc["room"] is not None:
+                out["tC"] = rc["room"]
         if (d.get("winopen") or {}).get("paused"):
             out["cl"]["paused"] = d["winopen"].get("reason") or "Fenster offen"
     m = d.get("meter")
@@ -104,7 +110,8 @@ def _run(c):
             from bus import set_status
             p = {"id": 0, **{k: v for k, v in (_j.loads(c.get("arg") or "{}")).items()
                              if k in ("on", "mode", "target_C", "fan", "swing_v", "swing_h", "eco", "turbo", "mute", "sleep", "display")}}
-            BUS.rpc(dev, "Climate.Set", p)
+            import roomctl
+            BUS.rpc(dev, "Climate.Set", roomctl.filter_set(dev, p))
             set_status(dev, "climate:0", BUS.rpc(dev, "Climate.GetStatus", {"id": 0}), merge=True)
             errs = []
         elif act == "pos":

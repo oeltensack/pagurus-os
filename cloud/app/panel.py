@@ -105,8 +105,14 @@ def _tile(d):
         t.update(state=s.get("state"), pos=s.get("current_pos"), posc=bool(s.get("pos_control")))
     elif k == "climate":
         room = s.get("ext_temperature_C", s.get("current_C"))
+        import roomctl
+        rc = roomctl.view(d["id"])
+        tgt = s.get("target_C")
+        if rc and rc["wish"] is not None:                 # Raumregelung: Wunsch und Raumfuehler zeigen
+            tgt = rc["wish"]
+            room = rc["room"] if rc["room"] is not None else room
         t.update(on=bool(s.get("output")), link=s.get("link") is not False, mode=s.get("mode"),
-                 target=s.get("target_C"), fan=s.get("fan"), room_C=room, hum=s.get("ext_humidity"),
+                 target=tgt, fan=s.get("fan"), room_C=room, hum=s.get("ext_humidity"),
                  outdoor=s.get("outdoor_C"), modes=s.get("modes") or ["cool", "heat", "dry", "fan", "auto"],
                  fans=s.get("fans") or ["auto", "low", "low_mid", "mid", "mid_high", "high"], step=s.get("step_C") or 1,
                  min=s.get("min_C") or 16, max=s.get("max_C") or 31,

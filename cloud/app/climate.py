@@ -83,7 +83,8 @@ def _apply(dev, act):
         else:
             q("UPDATE winopen SET paused=NULL, until=NULL, saved=NULL, reason=NULL WHERE dev=?", (dev,))
         return
-    BUS.rpc(dev, "Climate.Set", {"id": 0, **act})
+    import roomctl
+    BUS.rpc(dev, "Climate.Set", roomctl.filter_set(dev, {"id": 0, **act}))
 
 
 def run_schedules():
@@ -111,6 +112,7 @@ def _f(v):
 
 
 def record():
+    import roomctl
     ts = int(time.time()) // 60 * 60
     for r in q("SELECT id, status FROM devices WHERE comp LIKE 'climate:%' AND online=1"):
         st = json.loads(r["status"] or "{}")
@@ -118,7 +120,8 @@ def record():
             continue
         q("""INSERT OR REPLACE INTO climate_log(dev, ts, on_, mode, target, room, unit, outlet, hum, comp)
              VALUES(?,?,?,?,?,?,?,?,?,?)""",
-          (r["id"], ts, 1 if st.get("output") else 0, st.get("mode"), _f(st.get("target_C")),
+          (r["id"], ts, 1 if st.get("output") else 0, st.get("mode"),
+           _f(roomctl.wish(r["id"])) if roomctl.wish(r["id"]) is not None else _f(st.get("target_C")),
            _f(st.get("ext_temperature_C")) if _f(st.get("ext_temperature_C")) is not None else _f(st.get("current_C")),
            _f(st.get("current_C")), _f(st.get("outlet_C")),
            _f(st.get("ext_humidity")), 1 if st.get("compressor") else 0))
